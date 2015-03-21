@@ -1,6 +1,7 @@
 package com.jacob.dashboard;
 
 import android.content.Context;
+import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.ComposePathEffect;
@@ -14,6 +15,7 @@ import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.SweepGradient;
 import android.util.AttributeSet;
+import android.util.TypedValue;
 import android.view.MotionEvent;
 import android.view.View;
 
@@ -52,45 +54,56 @@ public class MeasureDashBoard extends View {
      */
     private Path mDashPath;
 
-    private int mPaddingCircle = 30;
-    private int mRadiusMain = 280;
-    private int mRadiusChild = 30;
-    private int mDistanceCircle;
-    private int mDistanceLine;
-    private int mLayoutW;
+    //圆盘的半径
+    private int mRadiusMain = dpToPx(100);
+
+    //滑块的半径
+    private int mRadiusChild = dpToPx(20);
+
+    //屏幕的尺寸，正方型尺寸
+    private int mLayoutSize;
 
     //中心点坐标
     private int mCenterX;
     private int mCenterY;
 
+    //滑块中心点和屏幕中心点的距离
+    private int mDistanceSlider;
+
     //滑块中心点坐标
-    private float mSliderX = -1;
-    private float mSliderY = -1;
+    private float mSliderX;
+    private float mSliderY;
 
     private float lineX = -1;
     private float lineY = -1;
 
-    private String mTextCenter = "10.0";
-    private String mTitle = "测体温";
 
     //3个和绘制文字相关的rect
     private Rect mRectCenter = new Rect();
     private Rect mRectTitle = new Rect();
     private Rect mRectSlider = new Rect();
 
+    //仪表盘渐变色
     private int START_COLOR = Color.parseColor("#FF27D373");
     private int CENTER_COLOR = Color.parseColor("#BBE7EF83");
     private int END_COLOR = Color.parseColor("#FFFF4F4F");
 
+    //屏幕中心文字的大小和颜色
     private int mTextColor = Color.parseColor("#FF27D373");
+    private float mTextSize = spToPx(45);
 
     //圆盘的起始角度，和覆盖的角度
     public static final int START_ANGLE = 35;
     public static final int SWEEP_ANGLE = 290;
 
     //仪表盘支持的最大最小值
-    public static final int MAX_VALUE = 50;
-    public static final int MIN_VALUE = 10;
+    public int max_value = 50;
+    public int min_value = 10;
+
+    private int mStroke = 50;
+
+    private String mTextCenter = "10.0";
+    private String mTitle = "测体温";
 
     /**
      * 判断是否接触到滑块
@@ -112,11 +125,30 @@ public class MeasureDashBoard extends View {
 
     public MeasureDashBoard(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
+        TypedArray typedArray = context.obtainStyledAttributes(attrs, R.styleable.MeasureDashBoard);
+        mRadiusMain = typedArray.getDimensionPixelSize(R.styleable.MeasureDashBoard_radius_dashboard, mRadiusMain);
+        mRadiusChild = typedArray.getDimensionPixelSize(R.styleable.MeasureDashBoard_radius_slider, mRadiusChild);
+        mTextSize = typedArray.getDimension(R.styleable.MeasureDashBoard_main_textSize, mTextSize);
+        max_value = typedArray.getInteger(R.styleable.MeasureDashBoard_maxValue, max_value);
+        min_value = typedArray.getInteger(R.styleable.MeasureDashBoard_minValue, min_value);
+        mTextCenter = String.valueOf(formatDecimal(min_value, 1));
+        typedArray.recycle();
 
-        mLayoutW = 420 * 2;
-        mDistanceCircle = mRadiusMain + mPaddingCircle + mRadiusChild;
-        mCenterX = mLayoutW / 2;
-        mCenterY = mLayoutW / 2;
+        //屏幕尺寸,要加上滑块的直径长度
+        mLayoutSize = mRadiusMain * 2 + mRadiusChild * 3 + mStroke * 2;
+
+        //屏幕中心的位置
+        mCenterX = mLayoutSize / 2;
+        mCenterY = mLayoutSize / 2;
+
+        mDistanceSlider = mRadiusMain + mStroke / 2 + mRadiusChild + 5;
+
+        //设置起始滑块的位置，放在最小位置
+        mSliderX = mCenterX - (float) (mDistanceSlider * Math.sin(START_ANGLE * Math.PI * 2 / 360.0));
+        mSliderY = mCenterY + (float) (mDistanceSlider * Math.cos(START_ANGLE * Math.PI * 2 / 360.0));
+        lineX = mCenterX - (float) ((mRadiusMain - mStroke / 2) * Math.sin(START_ANGLE * Math.PI * 2 / 360.0));
+        lineY = mCenterY + (float) ((mRadiusMain - mStroke / 2) * Math.cos(START_ANGLE * Math.PI * 2 / 360.0));
+
 
         initCirclePaint();
 
@@ -132,7 +164,7 @@ public class MeasureDashBoard extends View {
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        setMeasuredDimension(mLayoutW, mLayoutW);
+        setMeasuredDimension(mLayoutSize, mLayoutSize);
     }
 
     @Override
@@ -169,11 +201,11 @@ public class MeasureDashBoard extends View {
 
         //绘制最小值的文字
         double angle = Math.PI * 2 * 30 / 360.0f;
-        canvas.drawText(String.valueOf(MIN_VALUE), (float) (mCenterX - mRadiusMain * Math.sin(angle)),
+        canvas.drawText(String.valueOf(min_value), (float) (mCenterX - mRadiusMain * Math.sin(angle)),
                 (float) (mCenterY + mRadiusMain * Math.cos(angle)), mPaintTitle);
 
         //绘制最大值的文字
-        canvas.drawText(String.valueOf(MAX_VALUE), (float) (mCenterX + mRadiusMain * Math.sin(angle)) - 20,
+        canvas.drawText(String.valueOf(max_value), (float) (mCenterX + mRadiusMain * Math.sin(angle)) - 20,
                 (float) (mCenterY + mRadiusMain * Math.cos(angle)), mPaintTitle);
     }
 
@@ -198,33 +230,33 @@ public class MeasureDashBoard extends View {
                 hasTouchSlider = isInTheIndicatorScale(x, y);
                 double touchDistance = Math.hypot(touchDisX, touchDisY);
 
-                float lineDisX = (float) ((mRadiusMain - 25) * touchDisX / touchDistance);
-                float lineDisY = (float) ((mRadiusMain - 25) * touchDisY / touchDistance);
+                float lineDisX = (float) ((mRadiusMain - mStroke / 2) * touchDisX / touchDistance);
+                float lineDisY = (float) ((mRadiusMain - mStroke / 2) * touchDisY / touchDistance);
 
                 //得到触摸的点在第几象限
                 int guadrant = getQuadrant(x, y);
                 switch (guadrant) {
                     case 1:
-                        mSliderX = mCenterX + (float) (touchDisX * mDistanceCircle / touchDistance);
-                        mSliderY = mCenterY - (float) (touchDisY * mDistanceCircle / touchDistance);
+                        mSliderX = mCenterX + (float) (touchDisX * mDistanceSlider / touchDistance);
+                        mSliderY = mCenterY - (float) (touchDisY * mDistanceSlider / touchDistance);
                         lineX = mCenterX + lineDisX;
                         lineY = mCenterY - lineDisY;
                         break;
                     case 2:
-                        mSliderX = mCenterX - (float) (touchDisX * mDistanceCircle / touchDistance);
-                        mSliderY = mCenterY - (float) (touchDisY * mDistanceCircle / touchDistance);
+                        mSliderX = mCenterX - (float) (touchDisX * mDistanceSlider / touchDistance);
+                        mSliderY = mCenterY - (float) (touchDisY * mDistanceSlider / touchDistance);
                         lineX = mCenterX - lineDisX;
                         lineY = mCenterY - lineDisY;
                         break;
                     case 3:
-                        mSliderX = mCenterX - (float) (touchDisX * mDistanceCircle / touchDistance);
-                        mSliderY = mCenterY + (float) (touchDisY * mDistanceCircle / touchDistance);
+                        mSliderX = mCenterX - (float) (touchDisX * mDistanceSlider / touchDistance);
+                        mSliderY = mCenterY + (float) (touchDisY * mDistanceSlider / touchDistance);
                         lineX = mCenterX - lineDisX;
                         lineY = mCenterY + lineDisY;
                         break;
                     case 4:
-                        mSliderX = mCenterX + (float) (touchDisX * mDistanceCircle / touchDistance);
-                        mSliderY = mCenterY + (float) (touchDisY * mDistanceCircle / touchDistance);
+                        mSliderX = mCenterX + (float) (touchDisX * mDistanceSlider / touchDistance);
+                        mSliderY = mCenterY + (float) (touchDisY * mDistanceSlider / touchDistance);
                         lineX = mCenterX + lineDisX;
                         lineY = mCenterY + lineDisY;
                         break;
@@ -269,8 +301,8 @@ public class MeasureDashBoard extends View {
                 mPaintCenterText.setColor(mTextColor);
 
                 //通过角度计算滑动的数据
-                float value = (float) ((MAX_VALUE - MIN_VALUE) * angle * 1.0 / SWEEP_ANGLE);
-                mTextCenter = formatDecimal(MIN_VALUE + value, 1);
+                float value = (float) ((max_value - min_value) * angle * 1.0 / SWEEP_ANGLE);
+                mTextCenter = formatDecimal(min_value + value, 1);
 
                 //只有当数据没有越界，并且点击的区域在滑快区域才可以重绘
                 if (hasTouchSlider && !isOutBound) {
@@ -341,7 +373,7 @@ public class MeasureDashBoard extends View {
         mPaintCenterText.setDither(true);
         mPaintCenterText.setColor(mTextColor);
         mPaintCenterText.setStyle(Paint.Style.FILL);
-        mPaintCenterText.setTextSize(125);
+        mPaintCenterText.setTextSize(mTextSize);
         mPaintCenterText.getTextBounds("ABC", 0, 3, mRectCenter);
     }
 
@@ -354,7 +386,7 @@ public class MeasureDashBoard extends View {
         mPaintDashboard.setColor(START_COLOR);
         mPaintDashboard.setAntiAlias(true);
         mPaintDashboard.setDither(true);
-        mPaintDashboard.setStrokeWidth(50);
+        mPaintDashboard.setStrokeWidth(mStroke);
         mPaintDashboard.setStrokeJoin(Paint.Join.BEVEL);
         mPaintDashboard.setStyle(Paint.Style.STROKE);
         mDashPath = new Path();
@@ -404,4 +436,12 @@ public class MeasureDashBoard extends View {
 
     }
 
+
+    private int dpToPx(int dp) {
+        return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, getResources().getDisplayMetrics());
+    }
+
+    private int spToPx(int sp) {
+        return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sp, getResources().getDisplayMetrics());
+    }
 }

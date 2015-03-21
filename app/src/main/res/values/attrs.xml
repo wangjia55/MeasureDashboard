@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="MeasureDashBoard">
+        <attr name="radius_dashboard" format="dimension"/>
+        <attr name="radius_slider" format="dimension"/>
+        <attr name="main_textSize" format="dimension"/>
+        <attr name="minValue" format="integer"/>
+        <attr name="maxValue" format="integer"/>
+    </declare-styleable>
+</resources>
