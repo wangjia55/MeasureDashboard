@@ -410,10 +410,14 @@ public class MeasureDashBoard extends View {
      * 如果点中了才可以滑动
      */
     public boolean isInTheIndicatorScale(float x, float y) {
-        return (x >= mSliderX - mRadiusChild * 2
-                && x <= mSliderX + mRadiusChild * 2)
-                && (y >= mSliderY - mRadiusChild * 2
-                && y <= mSliderY + mRadiusChild * 2);
+        float deltaX= x-mCenterX;
+        float deltaY = y -mCenterY;
+        float distance = (float) Math.sqrt(deltaX*deltaX+deltaY*deltaY);
+        if (distance>=mRadiusMain-mStroke/2){
+            return true;
+        }else{
+            return false;
+        }
     }
 
 
